@@ -36,9 +36,53 @@ def convert_conditions( hass: HomeAssistant, conditions ):
 EVENT_ENTITY_DOMAIN = 'event'
 EVENT_TYPE_EVENT_ENTITY = 'event_entity'
 
+SENSOR_DOMAIN = 'sensor'
+# Matter "Current switch position" diagnostic sensor (Generic Switch cluster).
+SWITCH_POSITION_KEY = 'SwitchCurrentPosition'
+
+def is_switch_position_unique_id( unique_id ) -> bool:
+    return SWITCH_POSITION_KEY in str(unique_id or '')
+
 @callback
 def _is_event_entity_state_change( data ) -> bool:
-    return str(data.get('entity_id', '')).startswith(f"{EVENT_ENTITY_DOMAIN}.")
+    entity_id = str(data.get('entity_id', ''))
+    return entity_id.startswith(f"{EVENT_ENTITY_DOMAIN}.") or entity_id.startswith(f"{SENSOR_DOMAIN}.")
+
+def format_switch_position_state( hass: HomeAssistant, event: Event ) -> dict | None:
+    """Turn a state_changed event of a Matter `Current switch position` sensor into
+    switch data. Every change is one scroll notch and is delivered unbatched, which
+    reacts better to scrolling than the batched `multi_press_N` event entities.
+    Returns None for anything else (other sensors, startup restore, unavailable)."""
+    new_state = event.data.get('new_state')
+    old_state = event.data.get('old_state')
+    if new_state is None or old_state is None:
+        return None
+    if new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN) or old_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        return None
+    if new_state.state == old_state.state:
+        return None
+
+    entity_registry = er.async_get(hass)
+    entry = entity_registry.async_get(new_state.entity_id)
+    if entry is None or not is_switch_position_unique_id( entry.unique_id ):
+        return None
+
+    return {
+        **dict(new_state.attributes),
+        'entity_id': new_state.entity_id,
+        'state': new_state.state,
+        'old_state': old_state.state,
+        'event_type': 'position_changed',
+        'device_id': entry.device_id,
+        'unique_id': entry.unique_id,
+        'original_name': entry.original_name,
+        'platform': entry.platform,
+        'endpoint': matter_endpoint_from_unique_id(entry.unique_id),
+        'entity_index': 0,
+        'entity_count': 1,
+        'presses': 1,
+        'attributes': dict(new_state.attributes),
+    }
 
 def format_event_entity_state( hass: HomeAssistant, event: Event ) -> dict | None:
     """Turn a state_changed event of an `event.*` entity into switch data.
@@ -299,7 +343,10 @@ async def create_event_listeners( hass: HomeAssistant, blueprint, mqtt_topic, _c
 
     @callback
     def _handleEntityEvent( event: Event ):
-        data = format_event_entity_state( hass, event )
+        if str(event.data.get('entity_id', '')).startswith(f"{SENSOR_DOMAIN}."):
+            data = format_switch_position_state( hass, event )
+        else:
+            data = format_event_entity_state( hass, event )
         if data is not None:
             _callback( data, event.context )
 
