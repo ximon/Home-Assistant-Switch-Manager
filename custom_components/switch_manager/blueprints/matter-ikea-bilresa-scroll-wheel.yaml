@@ -9,9 +9,11 @@ info: >-
   part only cycles the LED and produces no Home Assistant event. The three buttons
   here are the three LEDs (left = LED 1, middle = LED 2, right = LED 3), each with
   press / press 2x / hold / hold (released) / rotate right / rotate left.
-  Rotate uses the diagnostic "Current switch position" sensors (one per rotate
-  endpoint, sensor.*) instead of the event entities: they fire once per notch and
-  react better to scrolling. Make sure those sensors are enabled for the device.
+  Rotate defaults to the event entities (batched, original behaviour). To use the
+  diagnostic "Current switch position" sensors instead (sensor.*, one event per
+  notch, react better to scrolling), add a switch variable rotate_source with the
+  value position (switch menu, top right, Variables) and make sure those sensors
+  are enabled for the device.
   Rotate: a single light.turn_on with brightness_step_pct (e.g. 5 / -5) is enough.
   Fast scrolling is batched by Matter into one event covering several notches and
   the rotate actions multiply brightness_step_pct by that notch count
@@ -54,18 +56,16 @@ buttons:
           - key: event_type
             value: long_release
       - title: rotate right
-        conditions:
-          - key: endpoint
-            value: "1"
-          - key: event_type
-            value: position_changed
+        conditions: >-
+          {%- set src = (data.variables or {}).get('rotate_source', 'events') -%}
+          {{ (data.endpoint | int(-1)) == 1 and
+          ((data.event_type == 'position_changed') == (src == 'position')) }}
         scale_field: brightness_step_pct
       - title: rotate left
-        conditions:
-          - key: endpoint
-            value: "2"
-          - key: event_type
-            value: position_changed
+        conditions: >-
+          {%- set src = (data.variables or {}).get('rotate_source', 'events') -%}
+          {{ (data.endpoint | int(-1)) == 2 and
+          ((data.event_type == 'position_changed') == (src == 'position')) }}
         scale_field: brightness_step_pct
   # LED 2: endpoints rotate right = 4, rotate left = 5, press = 6
   - x: 148
@@ -98,18 +98,16 @@ buttons:
           - key: event_type
             value: long_release
       - title: rotate right
-        conditions:
-          - key: endpoint
-            value: "4"
-          - key: event_type
-            value: position_changed
+        conditions: >-
+          {%- set src = (data.variables or {}).get('rotate_source', 'events') -%}
+          {{ (data.endpoint | int(-1)) == 4 and
+          ((data.event_type == 'position_changed') == (src == 'position')) }}
         scale_field: brightness_step_pct
       - title: rotate left
-        conditions:
-          - key: endpoint
-            value: "5"
-          - key: event_type
-            value: position_changed
+        conditions: >-
+          {%- set src = (data.variables or {}).get('rotate_source', 'events') -%}
+          {{ (data.endpoint | int(-1)) == 5 and
+          ((data.event_type == 'position_changed') == (src == 'position')) }}
         scale_field: brightness_step_pct
   # LED 3: endpoints rotate right = 7, rotate left = 8, press = 9
   - x: 173
@@ -142,16 +140,14 @@ buttons:
           - key: event_type
             value: long_release
       - title: rotate right
-        conditions:
-          - key: endpoint
-            value: "7"
-          - key: event_type
-            value: position_changed
+        conditions: >-
+          {%- set src = (data.variables or {}).get('rotate_source', 'events') -%}
+          {{ (data.endpoint | int(-1)) == 7 and
+          ((data.event_type == 'position_changed') == (src == 'position')) }}
         scale_field: brightness_step_pct
       - title: rotate left
-        conditions:
-          - key: endpoint
-            value: "8"
-          - key: event_type
-            value: position_changed
+        conditions: >-
+          {%- set src = (data.variables or {}).get('rotate_source', 'events') -%}
+          {{ (data.endpoint | int(-1)) == 8 and
+          ((data.event_type == 'position_changed') == (src == 'position')) }}
         scale_field: brightness_step_pct
