@@ -61,6 +61,8 @@ def format_switch_position_state( hass: HomeAssistant, event: Event ) -> dict | 
         return None
     if new_state.state == old_state.state:
         return None
+    if new_state.state == '0':      # only the 0 -> 1 edge counts
+        return None
 
     entity_registry = er.async_get(hass)
     entry = entity_registry.async_get(new_state.entity_id)
